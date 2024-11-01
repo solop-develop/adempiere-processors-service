@@ -179,7 +179,7 @@ dependencies {
     compileOnly 'org.apache.tomcat:annotations-api:6.0.53'
     //implementation 'uy.solop:050-spuy-core:3.9.4-r-17.12'
     //	ADempiere Core + Patches + Features
-	implementation "com.solop:adempiere.solop_libs:3.9.4.001-spuy-0.0.1-rc-2"
+	implementation "com.solop:adempiere.solop_libs:3.9.4.001-spuy-0.0.1-rc-3"
 	//implementation 'javaee:javaee-api:5'
 	//implementation 'com.sun.mail:javax.mail:1.6.2'
 }
