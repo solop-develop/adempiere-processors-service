@@ -20,12 +20,12 @@ jobs:
       - name: Check out the repo
         uses: actions/checkout@v4
 
-      - name: Set up Java JDK 11
+      - name: Set up Java JDK 17
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-package: 'jdk'
-          java-version: 11
+          java-version: 17
           architecture: x64
 
       - name: Set Main Version
@@ -37,18 +37,11 @@ jobs:
       - name: Set Implementation Version
         run: echo "IMPLEMENTATION_VERSION=${{ github.event.release.tag_name }}" >> src/main/java/org/spin/base/version.properties
 
-      - name: Build with Gradle
-        uses: gradle/actions/setup-gradle@v3
-        with:
-          gradle-version: 8.0.2
-          arguments: createRelease
+      - name: Run Create Release
+        run: gradle createRelease
         env:
-          ORG_GRADLE_PROJECT_deployUsername: ${{ secrets.DEPLOY_USER }}
-          ORG_GRADLE_PROJECT_deployToken: ${{ secrets.DEPLOY_TOKEN }}
-          ORG_GRADLE_PROJECT_deplyRepository: ${{ secrets.DEPLOY_REPOSITORY }}
-          GITHUB_DEPLOY_USER: ${{ github.actor }}
-          GITHUB_DEPLOY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITHUB_DEPLOY_REPOSITORY: ${{ secrets.DEPLOY_REPOSITORY }}
+          GITHUB_DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          GITHUB_DEPLOY_TOKEN: ${{ secrets.DEPLOY_TOKEN }}
 
       - name: Upload descriptor file artifact
         uses: actions/upload-artifact@v4
@@ -57,29 +50,40 @@ jobs:
           path: build/descriptors/adempiere-processors-service.dsc
           retention-days: 1
 
+      - name: Upload envoy file artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: envoy.yaml
+          path: resources/envoy.yaml
+          retention-days: 1
+
       - name: Upload dist app zip artifact
         uses: actions/upload-artifact@v4
         with:
           name: adempiere-processors-service.zip
           path: build/release/adempiere-processors-service.zip
+          retention-days: 1
 
       - name: Upload dist app zip.MD5 artifact
         uses: actions/upload-artifact@v4
         with:
           name: adempiere-processors-service.zip.MD5
           path: build/release/adempiere-processors-service.zip.MD5
+          retention-days: 1
 
       - name: Upload dist app tar artifact
         uses: actions/upload-artifact@v4
         with:
           name: adempiere-processors-service.tar
           path: build/release/adempiere-processors-service.tar
+          retention-days: 1
 
       - name: Upload dist app tar.MD5 artifact
         uses: actions/upload-artifact@v4
         with:
           name: adempiere-processors-service.tar.MD5
           path: build/release/adempiere-processors-service.tar.MD5
+          retention-days: 1
 
   publish-binaries:
     name: Upload Binaries adempiere-processors-service
@@ -98,6 +102,13 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           args: adempiere-processors-service.dsc/adempiere-processors-service.dsc
+
+      - name: Upload Envoy config
+        uses: skx/github-action-publish-binaries@master
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          args: envoy.yaml/envoy.yaml
 
       - name: Upload zip
         uses: skx/github-action-publish-binaries@master
@@ -135,9 +146,9 @@ jobs:
       - build-app
     runs-on: ubuntu-latest
     outputs:
-      is_have_secrets: ${{ steps.check_secret_job.outputs.is_have_secrets }}
+      is_have_secrets: ${{ steps.check_docker_hub_secrets_job.outputs.is_have_secrets }}
     steps:
-      - id: check_secret_job
+      - id: check_docker_hub_secrets_job
         run: |
           if [[ "${{ vars.DOCKER_REGISTRY }}" != "" && \
                 "${{ vars.DOCKER_REPO }}" != "" && \
@@ -178,6 +189,7 @@ jobs:
           registry: ${{ vars.DOCKER_REGISTRY }}
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_TOKEN }}
+
       - name: Push alpine image in Docker Hub
         uses: docker/build-push-action@v6
         with:
@@ -185,8 +197,8 @@ jobs:
           file: docker/alpine.Dockerfile
           push: true
           tags: |
-            ${{ vars.DOCKER_REGISTRY }}/${{ vars.DOCKER_REPO }}:alpine-${{ github.event.release.tag_name }}
             ${{ vars.DOCKER_REGISTRY }}/${{ vars.DOCKER_REPO }}:alpine
+            ${{ vars.DOCKER_REGISTRY }}/${{ vars.DOCKER_REPO }}:alpine-${{ github.event.release.tag_name }}
 
   # TODO: Download .tar and add docker image without uncompress
   # Publish docker multiplatform image in Docker Hub Registry to application
@@ -228,7 +240,8 @@ jobs:
         with:
           context: .
           file: docker/focal.Dockerfile
-          platforms: linux/amd64,linux/amd64/v2,linux/arm64/v8
+          platforms: linux/amd64,linux/amd64/v2
+          # platforms: linux/amd64,linux/amd64/v2,linux/arm64/v8
           push: true
           tags: |
             ${{ vars.DOCKER_REGISTRY }}/${{ vars.DOCKER_REPO }}:${{ github.event.release.tag_name }}
