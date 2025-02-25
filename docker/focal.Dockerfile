@@ -1,4 +1,4 @@
-FROM eclipse-temurin:11.0.24_8-jdk-focal
+FROM eclipse-temurin:17.0.12_7-jdk-focal
 
 LABEL maintainer="ySenih@erpya.com; EdwinBetanc0urt@outlook.com;" \
 	description="ADempiere Processors gRPC"
@@ -21,20 +21,25 @@ ENV \
 	KEEPALIVE_TIME="360000" \
 	CONNECTION_TEST_QUERY="\"SELECT 1\"" \
 	JAVA_OPTIONS="\"-Xms64M\" \"-Xmx1512M\"" \
+	SYSTEM_LOGO_URL="" \
 	TZ="America/Caracas"
 
 EXPOSE ${SERVER_PORT}
 
 
 # Add operative system dependencies
-RUN	apt-get update && \
+RUN rm -rf /var/lib/apt/lists/* && \
+	rm -rf /tmp/* && \
+	echo ttf-mscorefonts-installer msttcorefonts/accepted-mscorefonts-eula select true | debconf-set-selections && \
+	apt-get update && \
 	apt-get install -y \
 		tzdata \
 		bash \
 		fontconfig \
-		ttf-dejavu && \
-	rm -rf /var/lib/apt/lists/* \
-	rm -rf /tmp/* && \
+		ttf-dejavu \
+		fontconfig-config \
+		ttf-mscorefonts-installer && \
+	fc-cache -f && \
 	echo "Set Timezone..." && \
 	echo $TZ > /etc/timezone
 

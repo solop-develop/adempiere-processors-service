@@ -1,4 +1,4 @@
-FROM eclipse-temurin:11.0.24_8-jdk-alpine
+FROM eclipse-temurin:17.0.12_7-jdk-alpine
 
 LABEL maintainer="ySenih@erpya.com; EdwinBetanc0urt@outlook.com;" \
 	description="ADempiere Processors gRPC"
@@ -21,20 +21,22 @@ ENV \
 	KEEPALIVE_TIME="360000" \
 	CONNECTION_TEST_QUERY="\"SELECT 1\"" \
 	JAVA_OPTIONS="\"-Xms64M\" \"-Xmx1512M\"" \
+	SYSTEM_LOGO_URL="" \
 	TZ="America/Caracas"
 
 EXPOSE ${SERVER_PORT}
 
 
 # Add operative system dependencies
-RUN	apk update && \
+RUN rm -rf /tmp/* && \
+	apk update && \
 	apk add --no-cache \
 		tzdata \
 		bash \
 		fontconfig \
-		ttf-dejavu && \
-	rm -rf /var/cache/apk/* && \
-	rm -rf /tmp/* && \
+		ttf-dejavu \
+		msttcorefonts-installer && \
+	fc-cache -f && \
 	echo "Set Timezone..." && \
 	echo $TZ > /etc/timezone
 
