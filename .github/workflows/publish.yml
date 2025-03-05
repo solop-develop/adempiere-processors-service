@@ -235,7 +235,7 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_TOKEN }}
 
-      - name: Push alpine image in Docker Hub
+      - name: Push focal image in Docker Hub
         uses: docker/build-push-action@v6
         with:
           context: .
