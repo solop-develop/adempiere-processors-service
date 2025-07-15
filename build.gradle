@@ -65,7 +65,7 @@ dependencies {
     compileOnly 'org.apache.tomcat:annotations-api:6.0.53'
 
 	//	ADempiere Core + Patches + Features
-	implementation "com.solop:adempiere.solop_libs:2.1.18"
+	implementation "com.solop:adempiere.solop_libs:2.1.21"
 }
 
 configurations.all {
