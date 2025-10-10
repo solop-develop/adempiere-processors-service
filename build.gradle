@@ -2,42 +2,78 @@ plugins {
     id 'java'
     id 'com.google.protobuf' version '0.9.4'
     id 'idea'
+	// Provide convenience executables for trying out the examples.
     id 'application'
+	// Generate Visual Studio Code .vscode & .json project files
     id 'visual-studio'
-    id 'maven-publish'
+	// Read .env files
 	id "io.github.uoxx3.project-environment" version "1.0.1"
 }
 
-group 'com.nikhilm'
 
-java {
-    sourceCompatibility = JavaVersion.VERSION_11
-    targetCompatibility = JavaVersion.VERSION_17
-}
-
-def grpcVersion = '1.63.0'
+def grpcVersion = '1.65.1'
 def protobufVersion = '3.25.3'
 def adempiereCoreVersion = '1.4.10'
+def descriptorFile = "adempiere-processors-service.dsc"
 
-def descriptorFile = "adempiere-grpc-server.dsc"
-def javaMainClass = "org.spin.server.AllInOneServices"
+
+ext {
+	javaMainClass = "org.spin.processor.server.ProcessorServer"
+}
+
+
+java {
+	sourceCompatibility = JavaVersion.VERSION_11
+	targetCompatibility = JavaVersion.VERSION_17
+}
+
+application {
+	mainClass.set(javaMainClass)
+
+	// distribution output
+	distributions {
+		main {
+			contents {
+			}
+		}
+	}
+}
+jar {
+	manifest {
+		attributes(
+			"Main-Class": javaMainClass
+		)
+	}
+}
+
+run {
+	doFirst {
+		// Set environment variables by .env project file
+		environment 'JWT_SECRET_KEY', '52D11677CBB494878FD6E93B5A6615052A93B8AC654DE543CC4F53BA56027B1C'
+		environment 'JWT_EXPIRATION_TIME', 86400000
+		environment "TZ", projectEnv.get("TZ", null) ?: "America/Caracas"
+	}
+	args = [
+		"resources/env.yaml"
+	]
+}
 
 repositories {
 	mavenLocal()
 	mavenCentral()
 	maven {
+		// SOLOP libs + pacthces + improvements
 		url = 'https://maven.pkg.github.com/solop-develop/adempiere-solop'
 		credentials {
 			// project property, system property, .env project file, system enviroment variable
 			username = findProperty("deployUsername") ?: System.properties['deploy.user'] ?:
 				projectEnv.get("GITHUB_DEPLOY_USER", null) ?: System.getenv("GITHUB_DEPLOY_USER")
-			password = findProperty("deployPassword") ?: 
-				System.properties['deploy.token'] ?:
+			password = findProperty("deployToken") ?: System.properties['deploy.token'] ?:
 				projectEnv.get("GITHUB_DEPLOY_TOKEN", null) ?: System.getenv("GITHUB_DEPLOY_TOKEN")
 		}
 	}
 	maven {
-		// Adempiere GitHub Organization
+		// SOLOP Adempiere Base
 		url = 'https://maven.pkg.github.com/solop-develop/adempiere-base'
 		credentials {
 			// project property, system property, .env project file, system enviroment variable
@@ -48,9 +84,144 @@ repositories {
 		}
 	}
 	maven {
+		// Adempiere GitHub Organization or Custom Organization
+		url = findProperty("deployRepository") ?: System.properties['deploy.repository'] ?:
+			projectEnv.get("GITHUB_DEPLOY_REPOSITORY", null) ?: System.getenv("GITHUB_DEPLOY_REPOSITORY") ?:
+			"https://maven.pkg.github.com/adempiere/adempiere"
+		credentials {
+			// project property, system property, .env project file, system enviroment variable
+			username = findProperty("deployUsername") ?: System.properties['deploy.user'] ?:
+				projectEnv.get("GITHUB_DEPLOY_USER", null) ?: System.getenv("GITHUB_DEPLOY_USER")
+			password = findProperty("deployToken") ?: System.properties['deploy.token'] ?:
+				projectEnv.get("GITHUB_DEPLOY_TOKEN", null) ?: System.getenv("GITHUB_DEPLOY_TOKEN")
+		}
+	}
+	maven {
 		url = "https://maven.google.com/"
 	}
 }
+
+protobuf {
+    protoc {
+		artifact = "com.google.protobuf:protoc:${protobufVersion}"
+    }
+    plugins {
+        grpc {
+			artifact = "io.grpc:protoc-gen-grpc-java:${grpcVersion}"
+        }
+    }
+    generateProtoTasks {
+        all()*.plugins {
+            grpc {}
+		}
+		all().configureEach { task ->
+			// If true, will generate a descriptor_set.desc file under
+			// task.outputBaseDir. Default is false.
+			// See --descriptor_set_out in protoc documentation about what it is.
+			task.generateDescriptorSet = true
+
+			// Allows to override the default for the descriptor set location
+			task.descriptorSetOptions.path = "${projectDir}/build/descriptors/${descriptorFile}"
+			// task.descriptorSetOptions.path = "${projectDir}/build/descriptors/adempiere-grpc-server.dsc"
+
+			// If true, the descriptor set will contain line number information
+			// and comments. Default is false.
+			task.descriptorSetOptions.includeSourceInfo = true
+		
+			// If true, the descriptor set will contain all transitive imports and
+			// is therefore self-contained. Default is false.
+			task.descriptorSetOptions.includeImports = true
+		}
+	}
+}
+
+sourceSets {
+	main {
+		java {
+			srcDirs 'build/generated/source/proto/main/grpc'
+			srcDirs 'build/generated/source/proto/main/java'
+			srcDirs 'src/main/proto'
+			srcDirs 'src/patches'
+		}
+		resources {
+			srcDirs 'src/main/java'
+			include 'org/spin/base/version.properties'
+		}
+	}
+}
+
+startScripts {
+	applicationName = 'start-backend'
+
+	// default JVM setting
+	defaultJvmOpts = [
+		"-DPropertyFile=Adempiere.properties", 
+		"-Dorg.adempiere.server.embedded=true"
+	]
+	outputDir = new File(project.buildDir, 'tmp')
+	classpath = jar.outputs.files + project.configurations.runtimeClasspath
+
+	// Configure script names with extensions
+	doLast {
+		def unixScript = file(getUnixScript())
+		def windowsScript = file(getWindowsScript())
+
+		// Rename files after generating them
+		unixScript.renameTo("${unixScript.parent}/${applicationName}.sh")
+		windowsScript.renameTo("${windowsScript.parent}/${applicationName}.bat")
+
+		// Configure permissions for generated scripts
+		unixScript.setExecutable(true, false)
+		// windowsScript.setExecutable(true, false)
+	}
+}
+
+// Copy proto descriptor another folder
+allprojects {
+	task copyDescriptor(type: Copy) {
+		from "${projectDir}/build/descriptors/${descriptorFile}"
+		into "${projectDir}/resources/"
+		// into "${projectDir}/docker-compose/envoy/definitions/"
+		// rename { "${descriptorFile}" }
+
+		// task dependency
+		dependsOn "generateTestProto"
+	}
+
+	tasks.matching {
+		it.name.startsWith('compileJava')
+	}.each { task ->
+		task.finalizedBy copyDescriptor
+	}
+}
+
+// compressed files task
+distTar {
+	dependsOn compileTestJava, copyDescriptor, startScripts
+}
+distZip {
+	dependsOn compileTestJava, copyDescriptor, startScripts
+}
+
+//	Create release for project
+task createRelease(type: Copy) {
+   dependsOn build
+   from file("$buildDir/distributions/")
+   into file("$buildDir/release/")
+   //destinationDir(file('build/release/'))
+   doLast {
+        file('build/release/')
+        	.listFiles({file -> file.isFile()} as FileFilter).sort()
+        	.each { File file ->
+            ant.checksum file: file
+        }
+   	}
+}
+
+task cleanBuild(type: GradleBuild) {
+	tasks = ['clean', 'build']
+}
+
 dependencies {
     implementation fileTree(
         dir: 'dependencies',
@@ -105,153 +276,4 @@ configurations.all {
 		force("joda-time:joda-time:2.8.1")
 		// force("io.github.adempiere:adempiere-grpc-utils:local-1.0.0")
 	}
-}
-
-protobuf {
-    protoc {
-		artifact = "com.google.protobuf:protoc:${protobufVersion}"
-    }
-    plugins {
-        grpc {
-			artifact = "io.grpc:protoc-gen-grpc-java:${grpcVersion}"
-        }
-    }
-    generateProtoTasks {
-        all()*.plugins {
-            grpc {}
-		}
-		all().configureEach { task ->
-			// If true, will generate a descriptor_set.desc file under
-			// task.outputBaseDir. Default is false.
-			// See --descriptor_set_out in protoc documentation about what it is.
-			task.generateDescriptorSet = true
-
-			// Allows to override the default for the descriptor set location
-			task.descriptorSetOptions.path = "${projectDir}/build/descriptors/${descriptorFile}"
-			// task.descriptorSetOptions.path = "${projectDir}/build/descriptors/adempiere-grpc-server.dsc"
-
-			// If true, the descriptor set will contain line number information
-			// and comments. Default is false.
-			task.descriptorSetOptions.includeSourceInfo = true
-		
-			// If true, the descriptor set will contain all transitive imports and
-			// is therefore self-contained. Default is false.
-			task.descriptorSetOptions.includeImports = true
-		}
-	}
-}
-// Copy proto descriptor another folder
-allprojects {
-	task copyDescriptor(type: Copy) {
-		from "${projectDir}/build/descriptors/${descriptorFile}"
-		into "${projectDir}/resources/"
-		// into "${projectDir}/docker-compose/envoy/definitions/"
-		// rename { "${descriptorFile}" }
-
-		// task dependency
-		dependsOn "generateTestProto"
-	}
-
-	tasks.matching {
-		it.name.startsWith('compileJava')
-	}.each { task ->
-		task.finalizedBy copyDescriptor
-	}
-}
-
-// Inform IDEs like IntelliJ IDEA, Eclipse or NetBeans about the generated code.
-sourceSets {
-    main {
-        java {
-            srcDirs 'build/generated/source/proto/main/grpc'
-            srcDirs 'build/generated/source/proto/main/java'
-            srcDirs 'src/main/proto'
-			srcDirs 'src/patches'
-        }
-        resources {
-    		srcDirs 'src/main/java'
-			include 'org/spin/base/version.properties'
-        	include 'org/adempiere/legacy/apache/ecs/ecs.properties'
-    	}
-    }
-}
-
-
-run {
-	args = [
-		"resources/standalone.yaml"
-	]
-}
-
-// compressed files task
-distTar {
-	dependsOn compileTestJava, copyDescriptor, startScripts
-}
-distZip {
-	dependsOn compileTestJava, copyDescriptor, startScripts
-}
-
-startScripts {
-	applicationName = 'adempiere-processors-service-server'
-
-	// default JVM setting
-	defaultJvmOpts = [
-		"-DPropertyFile=Adempiere.properties", 
-		"-Dorg.adempiere.server.embedded=true"
-	]
-	outputDir = new File(project.buildDir, 'tmp')
-	classpath = jar.outputs.files + project.configurations.runtimeClasspath
-
-	// Configure script names with extensions
-	doLast {
-		def unixScript = file(getUnixScript())
-		def windowsScript = file(getWindowsScript())
-
-		// Rename files after generating them
-		unixScript.renameTo("${unixScript.parent}/${applicationName}.sh")
-		windowsScript.renameTo("${windowsScript.parent}/${applicationName}.bat")
-
-		// Configure permissions for generated scripts
-		unixScript.setExecutable(true, false)
-		// windowsScript.setExecutable(true, false)
-	}
-}
-
-application {
-	// mainClass = javaMainClass
-	mainClass.set(javaMainClass)
-
-	// distribution output
-	distributions {
-		main {
-			contents {
-			}
-		}
-	}
-}
-jar {
-	manifest {
-		attributes(
-			'Main-Class': javaMainClass
-		)
-	}
-}
-
-//	Create release for project
-task createRelease(type: Copy) {
-   dependsOn build
-   from file("$buildDir/distributions/")
-   into file("$buildDir/release/")
-   //destinationDir(file('build/release/'))
-   doLast {
-        file('build/release/')
-        	.listFiles({file -> file.isFile()} as FileFilter).sort()
-        	.each { File file ->
-            ant.checksum file: file
-        }
-   	}
-}
-
-task cleanBuild(type: GradleBuild) {
-	tasks = ['clean', 'build']
 }
