@@ -5,6 +5,7 @@ plugins {
     id 'application'
     id 'visual-studio'
     id 'maven-publish'
+	id "io.github.uoxx3.project-environment" version "1.0.1"
 }
 
 group 'com.nikhilm'
@@ -18,8 +19,8 @@ def grpcVersion = '1.63.0'
 def protobufVersion = '3.25.3'
 def adempiereCoreVersion = '1.4.10'
 
-def descriptorFile = "adempiere-processors-service.dsc"
-def javaMainClass = "org.spin.processor.server.ProcessorServer"
+def descriptorFile = "adempiere-grpc-server.dsc"
+def javaMainClass = "org.spin.server.AllInOneServices"
 
 repositories {
 	mavenLocal()
@@ -27,18 +28,23 @@ repositories {
 	maven {
 		url = 'https://maven.pkg.github.com/solop-develop/adempiere-solop'
 		credentials {
-			// project property, system properrty, enviroment variable
-			username = findProperty("deployUsername") ?: System.properties['deploy.user'] ?: System.getenv("GITHUB_DEPLOY_USER")
-			password = findProperty("deployToken") ?: System.properties['deploy.token'] ?: System.getenv("GITHUB_DEPLOY_TOKEN")
+			// project property, system property, .env project file, system enviroment variable
+			username = findProperty("deployUsername") ?: System.properties['deploy.user'] ?:
+				projectEnv.get("GITHUB_DEPLOY_USER", null) ?: System.getenv("GITHUB_DEPLOY_USER")
+			password = findProperty("deployPassword") ?: 
+				System.properties['deploy.token'] ?:
+				projectEnv.get("GITHUB_DEPLOY_TOKEN", null) ?: System.getenv("GITHUB_DEPLOY_TOKEN")
 		}
 	}
 	maven {
 		// Adempiere GitHub Organization
 		url = 'https://maven.pkg.github.com/solop-develop/adempiere-base'
 		credentials {
-			// project property, system properrty, enviroment variable
-			username = findProperty("deployUsername") ?: System.properties['deploy.user'] ?: System.getenv("GITHUB_DEPLOY_USER")
-			password = findProperty("deployToken") ?: System.properties['deploy.token'] ?: System.getenv("GITHUB_DEPLOY_TOKEN")
+			// project property, system property, .env project file, system enviroment variable
+			username = findProperty("deployUsername") ?: System.properties['deploy.user'] ?:
+				projectEnv.get("GITHUB_DEPLOY_USER", null) ?: System.getenv("GITHUB_DEPLOY_USER")
+			password = findProperty("deployPassword") ?: System.properties['deploy.token'] ?:
+				projectEnv.get("GITHUB_DEPLOY_TOKEN", null) ?: System.getenv("GITHUB_DEPLOY_TOKEN")
 		}
 	}
 	maven {
@@ -53,17 +59,17 @@ dependencies {
         ]
     )
 	implementation "io.netty:netty-handler:4.1.107.Final"
-	implementation "io.grpc:grpc-alts:${grpcVersion}"
+    implementation "io.grpc:grpc-alts:${grpcVersion}"
 	runtimeOnly "io.grpc:grpc-netty-shaded:${grpcVersion}"
-	implementation "io.grpc:grpc-protobuf:${grpcVersion}"
-	implementation "io.grpc:grpc-stub:${grpcVersion}"
-	implementation "io.grpc:grpc-netty:${grpcVersion}"
-	// https://mvnrepository.com/artifact/com.google.protobuf/protobuf-java
+    implementation "io.grpc:grpc-protobuf:${grpcVersion}"
+    implementation "io.grpc:grpc-stub:${grpcVersion}"
+    implementation "io.grpc:grpc-netty:${grpcVersion}"
+    // https://mvnrepository.com/artifact/com.google.protobuf/protobuf-java
 	implementation "com.google.protobuf:protobuf-java:${protobufVersion}"
 	implementation "com.google.protobuf:protobuf-java-util:${protobufVersion}"
-	implementation 'javax.activation:activation:1.1.1'
+    implementation 'javax.activation:activation:1.1.1'
 	//	Others
-	compileOnly 'org.apache.tomcat:annotations-api:6.0.53'
+    compileOnly 'org.apache.tomcat:annotations-api:6.0.53'
 
 	//	ADempiere Core
 	implementation "org.solop.adempiere:adempiere-core:${adempiereCoreVersion}"
@@ -122,7 +128,7 @@ protobuf {
 
 			// Allows to override the default for the descriptor set location
 			task.descriptorSetOptions.path = "${projectDir}/build/descriptors/${descriptorFile}"
-			// task.descriptorSetOptions.path = "${projectDir}/build/descriptors/adempiere-processors-service.dsc"
+			// task.descriptorSetOptions.path = "${projectDir}/build/descriptors/adempiere-grpc-server.dsc"
 
 			// If true, the descriptor set will contain line number information
 			// and comments. Default is false.
@@ -141,6 +147,9 @@ allprojects {
 		into "${projectDir}/resources/"
 		// into "${projectDir}/docker-compose/envoy/definitions/"
 		// rename { "${descriptorFile}" }
+
+		// task dependency
+		dependsOn "generateTestProto"
 	}
 
 	tasks.matching {
@@ -157,6 +166,7 @@ sourceSets {
             srcDirs 'build/generated/source/proto/main/grpc'
             srcDirs 'build/generated/source/proto/main/java'
             srcDirs 'src/main/proto'
+			srcDirs 'src/patches'
         }
         resources {
     		srcDirs 'src/main/java'
@@ -166,7 +176,6 @@ sourceSets {
     }
 }
 
-startScripts.enabled = false
 
 run {
 	args = [
@@ -174,9 +183,51 @@ run {
 	]
 }
 
+// compressed files task
+distTar {
+	dependsOn compileTestJava, copyDescriptor, startScripts
+}
+distZip {
+	dependsOn compileTestJava, copyDescriptor, startScripts
+}
+
+startScripts {
+	applicationName = 'adempiere-processors-service-server'
+
+	// default JVM setting
+	defaultJvmOpts = [
+		"-DPropertyFile=Adempiere.properties", 
+		"-Dorg.adempiere.server.embedded=true"
+	]
+	outputDir = new File(project.buildDir, 'tmp')
+	classpath = jar.outputs.files + project.configurations.runtimeClasspath
+
+	// Configure script names with extensions
+	doLast {
+		def unixScript = file(getUnixScript())
+		def windowsScript = file(getWindowsScript())
+
+		// Rename files after generating them
+		unixScript.renameTo("${unixScript.parent}/${applicationName}.sh")
+		windowsScript.renameTo("${windowsScript.parent}/${applicationName}.bat")
+
+		// Configure permissions for generated scripts
+		unixScript.setExecutable(true, false)
+		// windowsScript.setExecutable(true, false)
+	}
+}
+
 application {
 	// mainClass = javaMainClass
 	mainClass.set(javaMainClass)
+
+	// distribution output
+	distributions {
+		main {
+			contents {
+			}
+		}
+	}
 }
 jar {
 	manifest {
@@ -184,18 +235,6 @@ jar {
 			'Main-Class': javaMainClass
 		)
 	}
-}
-
-task AdempiereProcessorServer(type: CreateStartScripts) {
-	mainClass = javaMainClass
-    applicationName = 'adempiere-processors-service-server'
-    outputDir = new File(project.buildDir, 'tmp')
-    classpath = jar.outputs.files + project.configurations.runtimeClasspath
-}
-
-applicationDistribution.into('bin') {
-	from(AdempiereProcessorServer)
-    fileMode = 0755
 }
 
 //	Create release for project
