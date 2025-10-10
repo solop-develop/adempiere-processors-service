@@ -16,7 +16,7 @@ java {
 
 def grpcVersion = '1.63.0'
 def protobufVersion = '3.25.3'
-def adempiereCoreVersion = '1.0.1'
+def adempiereCoreVersion = '1.4.10'
 
 def descriptorFile = "adempiere-processors-service.dsc"
 def javaMainClass = "org.spin.processor.server.ProcessorServer"
@@ -53,45 +53,44 @@ dependencies {
         ]
     )
 	implementation "io.netty:netty-handler:4.1.107.Final"
-    implementation "io.grpc:grpc-alts:${grpcVersion}"
+	implementation "io.grpc:grpc-alts:${grpcVersion}"
 	runtimeOnly "io.grpc:grpc-netty-shaded:${grpcVersion}"
-    implementation "io.grpc:grpc-protobuf:${grpcVersion}"
-    implementation "io.grpc:grpc-stub:${grpcVersion}"
-    implementation "io.grpc:grpc-netty:${grpcVersion}"
-    // https://mvnrepository.com/artifact/com.google.protobuf/protobuf-java
+	implementation "io.grpc:grpc-protobuf:${grpcVersion}"
+	implementation "io.grpc:grpc-stub:${grpcVersion}"
+	implementation "io.grpc:grpc-netty:${grpcVersion}"
+	// https://mvnrepository.com/artifact/com.google.protobuf/protobuf-java
 	implementation "com.google.protobuf:protobuf-java:${protobufVersion}"
 	implementation "com.google.protobuf:protobuf-java-util:${protobufVersion}"
-    implementation 'javax.activation:activation:1.1.1'
+	implementation 'javax.activation:activation:1.1.1'
 	//	Others
-    compileOnly 'org.apache.tomcat:annotations-api:6.0.53'
+	compileOnly 'org.apache.tomcat:annotations-api:6.0.53'
 
-	//	ADempiere Core + Patches + Features
-	implementation "com.solop:adempiere.solop_libs:2.1.21"
 	//	ADempiere Core
 	implementation "org.solop.adempiere:adempiere-core:${adempiereCoreVersion}"
-	implementation "com.solop.adempiere.tools:solop-core:core-1.0.0-1.0.0"
+	implementation "com.solop.adempiere.tools:solop-core:core-1.4.4-1.0.1"
 	implementation "com.solop.adempiere.tools:display-definition:core-1.0.0-1.0.0"
 	// Firebase Connector
 	implementation "com.solop.adempiere.tools:adempiere-firebase-connector:core-1.0.0-1.0.0"
 	// Time Control
 	implementation "com.solop.adempiere.tools:time-control:core-1.0.0-1.0.0"
-	implementation "com.solop.adempiere.tools:performance-analysis:core-1.0.0-1.0.0"
-	implementation "com.solop.adempiere.verticals:import-export-management:core-1.0.0-1.0.0"
+	implementation "com.solop.adempiere.tools:performance-analysis:core-1.2.6-1.0.0"
+	implementation "com.solop.adempiere.verticals:import-export-management:core-1.4.4-1.0.0"
 	implementation "com.solop.adempiere.verticals:agency-project:core-1.0.0-1.0.0"
 	// Electronic Invoicing
-	implementation "com.solop.adempiere.tools:electronic-invoicing:core-1.0.0-1.0.0"
-	implementation "com.solop.adempiere.tools:shopping-admin-connection:core-1.0.0-1.0.0"
+	implementation "com.solop.adempiere.tools:electronic-invoicing:core-1.4.9-1.0.00"
+	implementation "com.solop.adempiere.tools:shopping-admin-connection:core-1.4.9-1.0.0"
 	implementation "com.solop.adempiere.tools:cloud-solop-notifier:core-1.0.0-1.0.0"
 	// Payment Processor
-	implementation "com.solop.adempiere.tools:payment-processor:core-1.0.0-1.0.0"
+	implementation "com.solop.adempiere.tools:payment-processor:core-1.4.9-1.0.0"
 	implementation "com.solop.adempiere.tools:warehouse-light:core-1.0.0-1.0.0"
 	implementation "com.solop.adempiere.tools:distribution-light:core-1.0.0-1.0.0"
 	implementation "com.solop.adempiere.tools:wms-light:core-1.0.0-1.0.0"
 	implementation "com.solop.adempiere.tools:additional-reports:core-1.0.0-1.0.0"
 	implementation "com.solop.adempiere.tools:intercompany-management:core-1.0.0-1.0.0"
 	implementation "com.solop.adempiere.verticals:delivery-management-service:core-1.0.0-1.0.0"
-	implementation "com.solop.adempiere.tools:adempiere-webhook:core-1.0.0-1.0.0"
+	implementation "com.solop.adempiere.tools:adempiere-webhook:core-1.2.9-1.0.0"
 	implementation "com.solop.adempiere.tools:external-store:core-1.0.0-1.0.0"
+	implementation "com.solop.adempiere.tools:core-tools:core-1.4.2-1.0.0"
 }
 
 configurations.all {
