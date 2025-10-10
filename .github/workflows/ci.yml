@@ -195,11 +195,11 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_TOKEN }}
 
-      - name: Push focal image in Docker Hub
+      - name: Push ubuntu image in Docker Hub
         uses: docker/build-push-action@v6
         with:
           context: .
-          file: docker/focal.Dockerfile
+          file: docker/ubuntu.Dockerfile
           platforms: linux/amd64,linux/amd64/v2
           push: true
           tags: |
