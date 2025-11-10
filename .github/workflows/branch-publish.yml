@@ -4,7 +4,7 @@
 name: Publish Branch to Docker Images
 
 permissions:
-  contents: read
+  contents: write
   packages: write
 
 on:
@@ -98,8 +98,8 @@ jobs:
           fi
 
   # Publish docker alpine image in Docker Hub Registry to application
-  push-alpine-image-dhr:
-    name: Push docker alpine image to Docker Hub
+  push-alpine-image-ci:
+    name: Push docker alpine image to Docker Hub (CI)
     needs:
       - check-docker-secrets
     # Skip step based on secret
@@ -151,8 +151,8 @@ jobs:
           tags: ${{ steps.set_tags_alpine.outputs.tags_to_push }}
 
   # Publish docker image multiplatform in Docker Hub Registry to application
-  push-image-dhr:
-    name: Push docker ubuntu multiplatform image to Docker Hub
+  push-image-ci:
+    name: Push docker ubuntu multiplatform image to Docker Hub (CI)
     needs:
       - check-docker-secrets
     # Skip step based on secret
