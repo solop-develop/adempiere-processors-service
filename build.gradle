@@ -13,7 +13,7 @@ plugins {
 
 def grpcVersion = '1.65.1'
 def protobufVersion = '3.25.3'
-def adempiereCoreVersion = '1.4.18'
+def adempiereCoreVersion = '1.4.19'
 def descriptorFile = "adempiere-processors-service.dsc"
 
 
